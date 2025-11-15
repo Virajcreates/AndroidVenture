@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AndroidVenture - Edge Detection Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎥 Real-Time Edge Detection Viewer</h1>
+            <p>Web viewer for Android OpenCV processing with live webcam demo</p>
+        </header>
+
+        <main>
+            <section class="viewer-section">
+                <h2>Processed Frame Display</h2>
+                <div class="frame-container">
+                    <canvas id="frameCanvas"></canvas>
+                    <video id="webcamVideo" style="display: none;" autoplay></video>
+                    <div id="loadingIndicator" class="loading">Click "Start Webcam" to begin</div>
+                </div>
+            </section>
+
+            <section class="stats-section">
+                <h2>Frame Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">FPS:</span>
+                        <span class="stat-value" id="fpsValue">0.0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Resolution:</span>
+                        <span class="stat-value" id="resolutionValue">0x0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Processing Time:</span>
+                        <span class="stat-value" id="processingTimeValue">0 ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Mode:</span>
+                        <span class="stat-value" id="modeValue">Edge Detection</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="controls-section">
+                <h2>Controls</h2>
+                <div class="button-group">
+                    <button id="startWebcamBtn" class="btn btn-primary">Start Webcam</button>
+                    <button id="stopWebcamBtn" class="btn btn-secondary" disabled>Stop Webcam</button>
+                    <button id="toggleModeBtn" class="btn btn-secondary">Toggle Mode</button>
+                    <button id="clearBtn" class="btn btn-outline">Clear Display</button>
+                </div>
+            </section>
+
+            <section class="info-section">
+                <h2>About This Demo</h2>
+                <p>
+                    This web viewer demonstrates real-time edge detection using your computer's webcam.
+                    The same edge detection algorithm (Sobel operator) is used as in the Android app,
+                    but implemented in JavaScript instead of OpenCV C++.
+                </p>
+                <div class="tech-stack">
+                    <h3>Tech Stack:</h3>
+                    <ul>
+                        <li>HTML5 Canvas for frame rendering</li>
+                        <li>WebRTC getUserMedia API for webcam access</li>
+                        <li>Sobel edge detection algorithm in JavaScript</li>
+                        <li>Real-time processing with requestAnimationFrame</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>AndroidVenture - Edge Detection Assessment Project</p>
+            <p>Built with ❤️ using Android + OpenCV C++ + TypeScript/JavaScript</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

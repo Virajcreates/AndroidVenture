@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AndroidVenture - Network Frame Receiver</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌐 Network Frame Receiver</h1>
+            <p>Receives processed frames from Android app via HTTP/WebSocket</p>
+        </header>
+
+        <main>
+            <section class="viewer-section">
+                <h2>Received Frame Display</h2>
+                <div class="frame-container">
+                    <canvas id="frameCanvas"></canvas>
+                    <div id="loadingIndicator" class="loading">Waiting for frames from Android app...</div>
+                </div>
+            </section>
+
+            <section class="stats-section">
+                <h2>Frame Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">FPS:</span>
+                        <span class="stat-value" id="fpsValue">0.0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Resolution:</span>
+                        <span class="stat-value" id="resolutionValue">0x0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Frames Received:</span>
+                        <span class="stat-value" id="frameCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Connection:</span>
+                        <span class="stat-value" id="connectionStatus">Disconnected</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="controls-section">
+                <h2>Connection Controls</h2>
+                <div class="button-group">
+                    <button id="connectBtn" class="btn btn-primary">Start HTTP Server</button>
+                    <button id="wsConnectBtn" class="btn btn-secondary">Start WebSocket</button>
+                    <button id="testBtn" class="btn btn-outline">Send Test Frame</button>
+                    <button id="clearBtn" class="btn btn-outline">Clear Display</button>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+                    <p><strong>HTTP Endpoint:</strong> POST to <code>http://localhost:9000/upload</code></p>
+                    <p><strong>WebSocket:</strong> Connect to <code>ws://localhost:8081</code></p>
+                    <p style="font-size: 0.9rem; color: #666; margin-top: 10px;">
+                        Send base64 encoded image data in JSON: <code>{"image": "data:image/png;base64,..."}</code>
+                    </p>
+                </div>
+            </section>
+
+            <section class="info-section">
+                <h2>How It Works</h2>
+                <div class="tech-stack">
+                    <h3>Network Bridge Architecture:</h3>
+                    <ul>
+                        <li><strong>HTTP POST:</strong> Android sends frame via HTTP POST request</li>
+                        <li><strong>WebSocket:</strong> Real-time bidirectional frame streaming</li>
+                        <li><strong>Base64 Encoding:</strong> Images encoded as base64 strings</li>
+                        <li><strong>Canvas Rendering:</strong> Decoded and displayed on HTML5 Canvas</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>AndroidVenture - Edge Detection Assessment Project</p>
+            <p>Network Frame Receiver Demo</p>
+        </footer>
+    </div>
+
+    <script>
+        class NetworkFrameReceiver {
+            constructor() {
+                this.canvas = document.getElementById('frameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.loadingIndicator = document.getElementById('loadingIndicator');
+                this.websocket = null;
+                this.httpServerRunning = false;
+                this.frameCount = 0;
+                this.lastFrameTime = performance.now();
+                this.fpsCounter = 0;
+
+                this.setupEventListeners();
+                this.initialize();
+            }
+
+            initialize() {
+                console.log('🚀 Network Frame Receiver initialized');
+                this.updateStatus('Disconnected', '#999');
+            }
+
+            setupEventListeners() {
+                document.getElementById('connectBtn').onclick = () => this.startHTTPListener();
+                document.getElementById('wsConnectBtn').onclick = () => this.connectWebSocket();
+                document.getElementById('testBtn').onclick = () => this.sendTestFrame();
+                document.getElementById('clearBtn').onclick = () => this.clearDisplay();
+            }
+
+            startHTTPListener() {
+                alert('HTTP Upload Endpoint:\n\nSend POST requests with JSON {"image":"data:image/png;base64,..."} to:\nhttp://localhost:9000/upload\n\nTip: Use the WebSocket button to auto-receive frames in real time.');
+                this.httpServerRunning = true;
+                this.updateStatus('HTTP Ready', '#4CAF50');
+                document.getElementById('connectBtn').disabled = true;
+                console.log('📡 HTTP endpoint ready at http://localhost:9000/upload');
+            }
+
+            connectWebSocket() {
+                try {
+                    console.log('🔌 Attempting WebSocket connection...');
+                    this.websocket = new WebSocket('ws://localhost:8081');
+
+                    this.websocket.onopen = () => {
+                        this.updateStatus('WebSocket Connected', '#2196F3');
+                        document.getElementById('wsConnectBtn').disabled = true;
+                        console.log('✅ WebSocket connected');
+                    };
+
+                    this.websocket.onmessage = (evt) => {
+                        try {
+                            const data = JSON.parse(evt.data);
+                            if (data.type === 'frame' && typeof data.image === 'string') {
+                                this.receiveFrame(data.image);
+                                // FPS accounting
+                                this.fpsCounter++;
+                                const now = performance.now();
+                                if (now - this.lastFrameTime >= 1000) {
+                                    const fps = this.fpsCounter / ((now - this.lastFrameTime) / 1000);
+                                    document.getElementById('fpsValue').textContent = fps.toFixed(1);
+                                    this.fpsCounter = 0;
+                                    this.lastFrameTime = now;
+                                }
+                            }
+                        } catch (e) {
+                            // Non-JSON messages ignored
+                        }
+                    };
+
+                    this.websocket.onclose = () => {
+                        this.updateStatus('WebSocket Disconnected', '#F44336');
+                        document.getElementById('wsConnectBtn').disabled = false;
+                        console.log('🔌 WebSocket disconnected');
+                    };
+
+                    this.websocket.onerror = (err) => {
+                        console.error('❌ WebSocket error:', err);
+                    };
+                } catch (error) {
+                    console.error('❌ WebSocket error:', error);
+                    alert('WebSocket connection failed: ' + error.message);
+                }
+            }
+
+            sendTestFrame() {
+                // Simulate receiving a frame with edge detection
+                console.log('📥 Receiving test frame...');
+                
+                // Create a test frame (edge detection pattern)
+                this.canvas.width = 480;
+                this.canvas.height = 640;
+                
+                // Draw test pattern
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                
+                // Draw some edge detection-like lines
+                for (let i = 0; i < 20; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(Math.random() * this.canvas.width, Math.random() * this.canvas.height);
+                    this.ctx.lineTo(Math.random() * this.canvas.width, Math.random() * this.canvas.height);
+                    this.ctx.stroke();
+                }
+                
+                // Draw text
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = '24px Arial';
+                this.ctx.fillText('Test Frame from Android', 50, 320);
+                
+                this.loadingIndicator.style.display = 'none';
+                
+                // Update stats
+                this.frameCount++;
+                document.getElementById('frameCount').textContent = this.frameCount;
+                document.getElementById('resolutionValue').textContent = 
+                    `${this.canvas.width}x${this.canvas.height}`;
+                
+                // Calculate FPS
+                this.fpsCounter++;
+                const currentTime = performance.now();
+                if (currentTime - this.lastFrameTime >= 1000) {
+                    const fps = this.fpsCounter / ((currentTime - this.lastFrameTime) / 1000);
+                    document.getElementById('fpsValue').textContent = fps.toFixed(1);
+                    this.fpsCounter = 0;
+                    this.lastFrameTime = currentTime;
+                }
+                
+                console.log('✅ Frame received and displayed');
+            }
+
+            // This method would be called when receiving actual data
+            receiveFrame(base64Image) {
+                const img = new Image();
+                img.onload = () => {
+                    this.canvas.width = img.width;
+                    this.canvas.height = img.height;
+                    this.ctx.drawImage(img, 0, 0);
+                    
+                    this.loadingIndicator.style.display = 'none';
+                    this.frameCount++;
+                    document.getElementById('frameCount').textContent = this.frameCount;
+                    document.getElementById('resolutionValue').textContent = 
+                        `${img.width}x${img.height}`;
+                };
+                img.src = base64Image;
+            }
+
+            updateStatus(text, color) {
+                const statusElement = document.getElementById('connectionStatus');
+                statusElement.textContent = text;
+                statusElement.style.color = color;
+            }
+
+            clearDisplay() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.loadingIndicator.style.display = 'block';
+                this.loadingIndicator.textContent = 'Waiting for frames...';
+                document.getElementById('fpsValue').textContent = '0.0';
+                document.getElementById('frameCount').textContent = '0';
+                document.getElementById('resolutionValue').textContent = '0x0';
+                this.frameCount = 0;
+                console.log('🧹 Display cleared');
+            }
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            const receiver = new NetworkFrameReceiver();
+            
+            // Expose for debugging
+            window.receiver = receiver;
+        });
+
+        // Example API endpoint handler (would be on server side in production)
+        // app.post('/upload', (req, res) => {
+        //     const { image } = req.body;
+        //     // Broadcast to connected clients
+        //     receiver.receiveFrame(image);
+        //     res.json({ success: true });
+        // });
+    </script>
+</body>
+</html>

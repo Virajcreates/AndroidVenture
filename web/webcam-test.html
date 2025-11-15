@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Edge Detection Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #1976D2;
+            margin-bottom: 20px;
+        }
+        .canvas-container {
+            background: #000;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #1976D2;
+        }
+        .btn-secondary {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: #388E3C;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            color: #1976D2;
+            font-weight: bold;
+        }
+        video {
+            display: none;
+        }
+        .message {
+            text-align: center;
+            color: white;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Webcam Edge Detection Test</h1>
+        
+        <div class="controls">
+            <button id="startBtn" class="btn-primary">Start Webcam</button>
+            <button id="stopBtn" class="btn-secondary" disabled>Stop Webcam</button>
+            <button id="toggleBtn" class="btn-secondary">Toggle Mode</button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div id="message" class="message">Click "Start Webcam" to begin</div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">FPS:</div>
+                <div class="stat-value" id="fps">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Mode:</div>
+                <div class="stat-value" id="mode">Edge Detection</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Resolution:</div>
+                <div class="stat-value" id="resolution">0x0</div>
+            </div>
+        </div>
+    </div>
+
+    <video id="video" autoplay></video>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const message = document.getElementById('message');
+        
+        let stream = null;
+        let animationId = null;
+        let mode = 'edge'; // 'edge' or 'gray'
+        let frameCount = 0;
+        let lastTime = performance.now();
+
+        startBtn.onclick = async () => {
+            try {
+                console.log('Requesting webcam...');
+                message.textContent = 'Requesting camera access...';
+                
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 }
+                });
+                
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    message.style.display = 'none';
+                    
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    
+                    document.getElementById('resolution').textContent = 
+                        `${video.videoWidth}x${video.videoHeight}`;
+                    
+                    processFrame();
+                    console.log('Webcam started!');
+                };
+            } catch (err) {
+                console.error('Error:', err);
+                message.textContent = `Error: ${err.message}`;
+                alert('Failed to access webcam: ' + err.message);
+            }
+        };
+
+        stopBtn.onclick = () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            message.style.display = 'block';
+            message.textContent = 'Stopped';
+            console.log('Webcam stopped');
+        };
+
+        toggleBtn.onclick = () => {
+            mode = mode === 'edge' ? 'gray' : 'edge';
+            document.getElementById('mode').textContent = 
+                mode === 'edge' ? 'Edge Detection' : 'Grayscale';
+        };
+
+        function processFrame() {
+            if (!stream) return;
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            if (mode === 'edge') {
+                applyEdgeDetection(imageData);
+            } else {
+                applyGrayscale(imageData);
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            // Calculate FPS
+            frameCount++;
+            const now = performance.now();
+            if (now - lastTime >= 1000) {
+                const fps = (frameCount * 1000) / (now - lastTime);
+                document.getElementById('fps').textContent = fps.toFixed(1);
+                frameCount = 0;
+                lastTime = now;
+            }
+
+            animationId = requestAnimationFrame(processFrame);
+        }
+
+        function applyGrayscale(imageData) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                data[i] = data[i + 1] = data[i + 2] = gray;
+            }
+        }
+
+        function applyEdgeDetection(imageData) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const temp = new Uint8ClampedArray(data);
+
+            // Convert to grayscale
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 0.299 * temp[i] + 0.587 * temp[i + 1] + 0.114 * temp[i + 2];
+                temp[i] = temp[i + 1] = temp[i + 2] = gray;
+            }
+
+            // Apply Sobel edge detection
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const idx = (y * width + x) * 4;
+
+                    const gx =
+                        -temp[((y - 1) * width + (x - 1)) * 4] +
+                        temp[((y - 1) * width + (x + 1)) * 4] +
+                        -2 * temp[(y * width + (x - 1)) * 4] +
+                        2 * temp[(y * width + (x + 1)) * 4] +
+                        -temp[((y + 1) * width + (x - 1)) * 4] +
+                        temp[((y + 1) * width + (x + 1)) * 4];
+
+                    const gy =
+                        -temp[((y - 1) * width + (x - 1)) * 4] +
+                        -2 * temp[((y - 1) * width + x) * 4] +
+                        -temp[((y - 1) * width + (x + 1)) * 4] +
+                        temp[((y + 1) * width + (x - 1)) * 4] +
+                        2 * temp[((y + 1) * width + x) * 4] +
+                        temp[((y + 1) * width + (x + 1)) * 4];
+
+                    const magnitude = Math.sqrt(gx * gx + gy * gy);
+                    const edge = magnitude > 50 ? 255 : 0;
+
+                    data[idx] = data[idx + 1] = data[idx + 2] = edge;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
