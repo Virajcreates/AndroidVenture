@@ -83,7 +83,7 @@ class MainActivity : AppCompatActivity() {
             isUploadEnabled = !isUploadEnabled
             if (isUploadEnabled) {
                 // TODO: Replace with your PC's LAN IP (find it with 'ipconfig' on Windows)
-                val serverIp = "192.168.1.3" // Change this to your PC's IP!
+                val serverIp = "10.22.94.224" // Updated to match new network IP
                 frameUploader = FrameUploader("http://$serverIp:9000/upload")
                 btnUpload.text = "Stop Upload"
                 Toast.makeText(this, "Upload enabled to $serverIp", Toast.LENGTH_SHORT).show()
@@ -122,8 +122,9 @@ class MainActivity : AppCompatActivity() {
                 val processedData = processFrame(imageData, width, height, isEdgeDetectionEnabled)
                 
                 // Calculate output dimensions (C++ resizes to 480 width)
+                // Note: Image is rotated 90 degrees in C++, so we use swapped dimensions for aspect ratio
                 val outputWidth = 480
-                val outputHeight = (height * outputWidth) / width
+                val outputHeight = (width * outputWidth) / height
                 
                 // Reuse bitmap or create new one
                 if (displayBitmap == null || displayBitmap?.width != outputWidth || displayBitmap?.height != outputHeight) {

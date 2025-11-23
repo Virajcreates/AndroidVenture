@@ -181,19 +181,70 @@ class CameraManager(
     }
     
     private fun imageToByteArray(image: android.media.Image): ByteArray {
-        val yBuffer = image.planes[0].buffer
-        val uBuffer = image.planes[1].buffer
-        val vBuffer = image.planes[2].buffer
+        val width = image.width
+        val height = image.height
         
-        val ySize = yBuffer.remaining()
-        val uSize = uBuffer.remaining()
-        val vSize = vBuffer.remaining()
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
         
-        val nv21 = ByteArray(ySize + uSize + vSize)
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
         
-        yBuffer.get(nv21, 0, ySize)
-        vBuffer.get(nv21, ySize, vSize)
-        uBuffer.get(nv21, ySize + vSize, uSize)
+        val yRowStride = yPlane.rowStride
+        // val yPixelStride = yPlane.pixelStride // Always 1 for Y
+        
+        val uvRowStride = vPlane.rowStride
+        val uvPixelStride = vPlane.pixelStride
+        
+        val ySize = width * height
+        val uvSize = width * height / 2
+        
+        // Allocate exact size for NV21 (Y + VU)
+        val nv21 = ByteArray(ySize + uvSize)
+        
+        // 1. Copy Y Plane (Row by Row to remove padding)
+        if (yRowStride == width) {
+            // Fast path: no padding
+            yBuffer.get(nv21, 0, ySize)
+        } else {
+            // Slow path: skip padding bytes at end of each row
+            for (row in 0 until height) {
+                yBuffer.position(row * yRowStride)
+                yBuffer.get(nv21, row * width, width)
+            }
+        }
+        
+        // 2. Copy UV Plane (NV21 expects V first, then U)
+        // We assume semi-planar (pixelStride == 2) which is standard for camera2 API
+        if (uvPixelStride == 2) {
+            // For NV21, we want the V buffer. In semi-planar, V and U are interleaved.
+            // V buffer usually starts at V, U buffer starts at U (offset by 1).
+            // We copy row-by-row from V buffer.
+            // Each row in UV plane has 'width' bytes (width/2 pixels * 2 bytes/pixel)
+            
+            val uvHeight = height / 2
+            
+            for (row in 0 until uvHeight) {
+                vBuffer.position(row * uvRowStride)
+                
+                // Calculate offset in output array
+                val outputOffset = ySize + (row * width)
+                
+                if (outputOffset + width <= nv21.size) {
+                    // We need to handle the case where the last row might be shorter or buffer ends
+                    val bytesToCopy = Math.min(width, vBuffer.remaining())
+                    vBuffer.get(nv21, outputOffset, bytesToCopy)
+                }
+            }
+        } else {
+            // Fallback for planar or other formats: just fill with 128 (gray) to avoid crashes
+            // This ensures geometry (Y) is correct even if color is lost
+            for (i in ySize until nv21.size) {
+                nv21[i] = 128.toByte()
+            }
+        }
         
         return nv21
     }

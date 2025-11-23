@@ -20,11 +20,17 @@ std::vector<uint8_t> EdgeProcessor::processFrame(
             return std::vector<uint8_t>();
         }
         
-        // Downscale for faster processing - reduced to 480 for even better performance
+        // Rotate 90 degrees clockwise for portrait mode
+        cv::Mat rotated;
+        cv::rotate(bgrImage, rotated, cv::ROTATE_90_CLOCKWISE);
+        
+        // Downscale for faster processing
+        // Note: After rotation, width and height are swapped
         cv::Mat resized;
         int targetWidth = 480;
-        int targetHeight = (height * targetWidth) / width;
-        cv::resize(bgrImage, resized, cv::Size(targetWidth, targetHeight), 0, 0, cv::INTER_NEAREST);
+        // Use rotated dimensions for aspect ratio calculation
+        int targetHeight = (rotated.rows * targetWidth) / rotated.cols;
+        cv::resize(rotated, resized, cv::Size(targetWidth, targetHeight), 0, 0, cv::INTER_NEAREST);
         
         cv::Mat processedImage;
         
